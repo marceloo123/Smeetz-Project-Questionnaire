@@ -505,6 +505,9 @@ function BizMatrix({value,onChange}){
 }
 
 function App(){
+  const [authed,setAuthed]=useState(false);
+  const [pwInput,setPwInput]=useState("");
+  const [pwError,setPwError]=useState(false);
   const [lang,setLang]=useState(null);
   const [step,setStep]=useState(0);
   const [ans,setAns]=useState({});
@@ -541,16 +544,11 @@ function App(){
 
   async function generate(){
     const c=classify(ans);setCls(c);setLoading(true);setDoc(null);
-    const apiKey=window._smeetzApiKey;
-    if(!apiKey){
-      const key=window.prompt("Please enter your Anthropic API key to generate the document.\n\nYou can find it at: console.anthropic.com");
-      if(!key){setLoading(false);return;}
-      window._smeetzApiKey=key.trim();
-    }
+    const apiKey="PASTE_YOUR_ANTHROPIC_KEY_HERE";
     try{
       const r=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":window._smeetzApiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:prompt(ans,c)}]})});
       if(!r.ok){
         const err=await r.json();
@@ -559,7 +557,7 @@ function App(){
       }
       const d=await r.json();
       setDoc(d.content?.map(b=>b.text||"").join("")||"Error generating document.");
-    }catch(e){setDoc("❌ Error: "+e.message+"\n\nPlease reload and try again with a valid API key.");}
+    }catch(e){setDoc("❌ Error: "+e.message+"\n\nPlease reload and try again.");}
     setLoading(false);
   }
 
@@ -604,6 +602,36 @@ function App(){
 
   const btn=(label,onClick,opts={})=>(
     <button onClick={onClick} disabled={opts.disabled} style={{padding:"10px "+(opts.wide?"28px":"18px"),borderRadius:8,border:opts.outline?"1.5px solid #00b4d8":"none",background:opts.disabled?"#9ca3af":opts.outline?"#fff":opts.color||"#1e3a5f",color:opts.outline?"#00b4d8":"#fff",fontWeight:700,fontSize:13,cursor:opts.disabled?"not-allowed":"pointer"}}>{label}</button>
+  );
+
+  if(!authed)return(
+    <div style={{fontFamily:"Inter,system-ui,sans-serif",minHeight:"100vh",background:"#f0f4f8",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#1e3a5f",color:"#fff",padding:"16px 24px",display:"flex",alignItems:"center",gap:12}}>
+        <div style={{background:"#00b4d8",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:18}}>S</div>
+        <div><div style={{fontWeight:700,fontSize:16}}>Smeetz Implementation Scoping</div><div style={{fontSize:12,opacity:.8}}>Sales → Implementation Handover Tool</div></div>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:32}}>
+        <div style={{background:"#fff",borderRadius:20,boxShadow:"0 4px 32px rgba(0,0,0,.1)",padding:"48px 40px",maxWidth:400,width:"100%",textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:16}}>🔒</div>
+          <h2 style={{color:"#1e3a5f",fontSize:22,marginBottom:8}}>Team Access</h2>
+          <p style={{color:"#6b7280",fontSize:14,marginBottom:28}}>Enter the Smeetz team password to continue.</p>
+          <input
+            type="password"
+            value={pwInput}
+            onChange={e=>{setPwInput(e.target.value);setPwError(false);}}
+            onKeyDown={e=>{if(e.key==="Enter"){if(pwInput==="Smeetzer2030"){setAuthed(true);}else{setPwError(true);}}}}
+            placeholder="Password"
+            style={{width:"100%",padding:"12px 14px",border:"1.5px solid "+(pwError?"#ef4444":"#e5e7eb"),borderRadius:8,fontSize:14,outline:"none",marginBottom:8,boxSizing:"border-box"}}
+          />
+          {pwError&&<p style={{color:"#ef4444",fontSize:12,marginBottom:8}}>Incorrect password. Please try again.</p>}
+          <button
+            onClick={()=>{if(pwInput==="Smeetzer2030"){setAuthed(true);}else{setPwError(true);}}}
+            style={{width:"100%",padding:"12px",borderRadius:8,border:"none",background:"#1e3a5f",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",marginTop:4}}>
+            Enter →
+          </button>
+        </div>
+      </div>
+    </div>
   );
 
   if(!lang)return(
