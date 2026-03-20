@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smeetz Implementation Scoping</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:Inter,system-ui,sans-serif;background:#f0f4f8;min-height:100vh;}
+    input,textarea,select,button{font-family:inherit;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState} = React;
+
+const BIZ_LINES=[{id:"ticketing",label:"Ticketing"},{id:"retail",label:"Retail"},{id:"fnb",label:"F&B"}];
+const CHANNELS=["Onsite","Online"];
+
+const T={
+  en:{
+    langLabel:"🇬🇧 English",appSubtitle:"Sales → Implementation Handover Tool",
+    stepOf:(a,b)=>`Step ${a} of ${b}`,complete:"% complete",back:"← Back",next:"Next →",
+    generate:"✨ Generate Scoping Document",select:"— Select —",
+    generating:"Generating your scoping document…",classifiedAs:"AUTO-CLASSIFIED AS",
+    copyMd:"📋 Copy Markdown",copied:"✓ Copied!",newProject:"+ New Project",
+    downloadDocx:"⬇️ Download .docx",downloading:"Preparing…",
+    docxHint:"Upload to Google Drive → opens in Google Docs for editing",
+    bizLinesHint:"Tick the business lines and channels in scope",
+    steps:[
+      {title:"Client Overview",icon:"🏢",fields:[
+        {id:"clientName",label:"Client Name",type:"text",required:true,placeholder:"e.g. Daytona Entertainment Ltd"},
+        {id:"website",label:"Website URL",type:"text",required:false,placeholder:"e.g. https://www.daytona.co.uk"},
+        {id:"clientType",label:"Vertical / Type of Business",type:"select",required:true,options:["Amusement Parks","Zoos & Aquariums","Museums & Heritage Sites","Family Entertainment Centers","Theatres & Live Entertainment Venues & Events","Other Experience"]},
+        {id:"clientTypeOther",label:"Please describe your experience",type:"text",required:false,placeholder:"e.g. Indoor go-kart and arcade entertainment centre"},
+        {id:"physicalScope",label:"Describe the physical setup",type:"textarea",required:true,placeholder:"e.g. Single site in Manchester. Includes main ticketing desk, 2 retail kiosks, restaurant and 3 entry gates with turnstiles."}
+      ]},
+      {title:"Operational Scope",icon:"⚙️",fields:[
+        {id:"businessLines",label:"Business Lines & Channels in Scope",type:"bizmatrix",required:true},
+        {id:"siteCount",label:"Number of planned sites in scope",type:"select",required:true,options:["1 – Single site","2–3 sites","4+ sites"]},
+        {id:"hasHardware",label:"Will physical hardware be required?",type:"select",required:true,options:["Yes – hardware required","No – no hardware needed"]},
+        {id:"hardwareDetails",label:"Describe the hardware needed",type:"textarea",required:true,placeholder:"e.g. 2x receipt printers, 4x handheld scanners, 3x card terminals, 1x label printer"},
+        {id:"peakVolume",label:"Entry / capacity constraints",type:"textarea",required:true,placeholder:"e.g. Time-slot entry, 3 independent gates, max 500/day, none"}
+      ]},
+      {title:"Products & Pricing",icon:"🎟️",fields:[
+        {id:"productTypes",label:"What types of products / booking flows exist?",type:"textarea",required:true,placeholder:"e.g. Timed entry tickets, memberships, birthday packages, group bookings"},
+        {id:"pricingComplexity",label:"Describe the pricing & discount structure",type:"textarea",required:true,placeholder:"e.g. Peak/off-peak pricing, 10% member discount, group rates, promo codes"},
+        {id:"accessControl",label:"How is visitor access / entry controlled today?",type:"textarea",required:true,placeholder:"e.g. QR code ticket, physical card, turnstile, none"}
+      ]},
+      {title:"Current System Landscape",icon:"🖥️",fields:[
+        {id:"existingSystems",label:"List all existing systems (one per line: Name – Function)",type:"textarea",required:true,placeholder:"e.g.\nParafait POS – ticketing & access control\nShopify – retail\nMailchimp – marketing"},
+        {id:"migrationNeeded",label:"Is data migration required?",type:"select",required:true,options:["Yes","No"]},
+        {id:"migrationSystems",label:"Which systems will data be migrated from?",type:"textarea",required:false,placeholder:"e.g. Parafait POS, Shopify, internal Excel spreadsheets"},
+        {id:"migrationData",label:"What data will be migrated?",type:"textarea",required:false,placeholder:"e.g. Customer records, product catalogue, membership data"},
+        {id:"migrationVolume",label:"How many records approximately?",type:"text",required:false,placeholder:"e.g. ~54,000 customer records, ~200 products"},
+        {id:"migrationPeriod",label:"What time period does the data cover?",type:"text",required:false,placeholder:"e.g. Last 3 years, all active members, full catalogue"},
+        {id:"cutovertStrategy",label:"Planned cutover approach?",type:"select",required:true,options:["Big Bang – all at once","Phased – department by department","Not yet defined"]}
+      ]},
+      {title:"Integrations & Development",icon:"🔗",fields:[
+        {id:"hasIntegrations",label:"Are third-party integrations required?",type:"select",required:true,options:["Yes","No"]},
+        {id:"integrationSystem",label:"Which system needs to be integrated?",type:"text",required:false,placeholder:"e.g. Sage, Mailchimp, Salesforce, access control hardware"},
+        {id:"integrationPurpose",label:"What is the purpose of the integration?",type:"textarea",required:false,placeholder:"e.g. Daily sales export to accounting, customer sync for marketing"},
+        {id:"integrationData",label:"What data should flow between the systems?",type:"textarea",required:false,placeholder:"e.g. Sales totals, customer name & email, booking status, membership level"},
+        {id:"customDev",label:"Is custom development required? (outside existing Smeetz functionality)",type:"select",required:true,options:["Yes","No"]},
+        {id:"customDevDetails",label:"Describe each custom development item",type:"textarea",required:false,placeholder:"e.g.\n1. Digital waiver flow – replace physical card tap with QR-based digital acceptance\n2. Guide management – assign guides to time-slot bookings with automated briefing emails"}
+      ]},
+      {title:"Stakeholders & Timeline",icon:"👥",fields:[
+        {id:"clientDecisionMaker",label:"Client Decision Maker (Name, role, email)",type:"text",required:true,placeholder:"e.g. Sarah Thompson, General Manager, s.thompson@daytona.co.uk"},
+        {id:"clientTechnical",label:"Client Technical Contact (Name, role, email)",type:"text",required:false,placeholder:"e.g. James Patel, IT Manager, j.patel@daytona.co.uk"},
+        {id:"clientProject",label:"Client Project Contact (Name, role, email)",type:"text",required:false,placeholder:"e.g. Laura Mills, Operations Lead, l.mills@daytona.co.uk"},
+        {id:"implManager",label:"Smeetz Implementation Manager (Name, email)",type:"text",required:false,placeholder:"e.g. Marc Dubois, m.dubois@smeetz.com"},
+        {id:"salesPerson",label:"Smeetz Sales Person (Name, email)",type:"text",required:false,placeholder:"e.g. Anna Becker, a.becker@smeetz.com"},
+        {id:"phaseDiscoveryStart",label:"Discovery – Start date",type:"text",required:false,placeholder:"e.g. 1 June 2025"},
+        {id:"phaseDiscoveryEnd",label:"Discovery – End date",type:"text",required:false,placeholder:"e.g. 15 June 2025"},
+        {id:"phaseImplStart",label:"Implementation – Start date",type:"text",required:true,placeholder:"e.g. 16 June 2025"},
+        {id:"phaseImplEnd",label:"Implementation – End date",type:"text",required:false,placeholder:"e.g. 31 July 2025"},
+        {id:"phaseTestStart",label:"Testing – Start date",type:"text",required:false,placeholder:"e.g. 1 August 2025"},
+        {id:"phaseTestEnd",label:"Testing – End date",type:"text",required:false,placeholder:"e.g. 20 August 2025"},
+        {id:"targetGoLive",label:"Go-Live – Target date",type:"text",required:true,placeholder:"e.g. 1 September 2025"},
+      ]},
+      {title:"Objectives & Risks",icon:"🎯",fields:[
+        {id:"objectives",label:"Key business objectives for this implementation?",type:"textarea",required:true,placeholder:"e.g. Replace legacy POS, unify online and on-site sales, enable online pre-booking"},
+        {id:"outOfScope",label:"Anything explicitly out of scope?",type:"textarea",required:false,placeholder:"e.g. HR management, loyalty programme, OTA distribution"},
+        {id:"openPoints",label:"What is still unknown or under discussion?",type:"textarea",required:false,placeholder:"e.g. F&B system unclear, online booking history TBC"},
+        {id:"keyRisks",label:"Known risks or dependencies?",type:"textarea",required:false,placeholder:"e.g. Legacy system documentation missing, limited IT availability, fixed go-live deadline"}
+      ]}
+    ]
+  },
+  fr:{
+    langLabel:"🇫🇷 Français",appSubtitle:"Outil de transfert Ventes → Implémentation",
+    stepOf:(a,b)=>`Étape ${a} sur ${b}`,complete:"% complété",back:"← Retour",next:"Suivant →",
+    generate:"✨ Générer le document de cadrage",select:"— Sélectionner —",
+    generating:"Génération du document…",classifiedAs:"CLASSIFIÉ AUTOMATIQUEMENT",
+    copyMd:"📋 Copier Markdown",copied:"✓ Copié!",newProject:"+ Nouveau projet",
+    downloadDocx:"⬇️ Télécharger .docx",downloading:"Préparation…",
+    docxHint:"Importer dans Google Drive → s'ouvre dans Google Docs",
+    bizLinesHint:"Cochez les secteurs et canaux dans le périmètre",
+    steps:[
+      {title:"Aperçu client",icon:"🏢",fields:[
+        {id:"clientName",label:"Nom du client",type:"text",required:true,placeholder:"ex. Daytona Entertainment SARL"},
+        {id:"website",label:"Site web",type:"text",required:false,placeholder:"ex. https://www.daytona.fr"},
+        {id:"clientType",label:"Vertical / Type de Business",type:"select",required:true,options:["Parcs d'attractions","Zoos & Aquariums","Musées & Sites patrimoniaux","Centres de loisirs familiaux","Théâtres & Salles de spectacle & Événements","Autre expérience"]},
+        {id:"clientTypeOther",label:"Décrivez votre expérience",type:"text",required:false,placeholder:"ex. Centre de karting et d'arcade indoor"},
+        {id:"physicalScope",label:"Configuration physique",type:"textarea",required:true,placeholder:"ex. Site unique à Paris. Billetterie principale, 2 kiosques retail, restaurant et 3 portiques d'entrée."}
+      ]},
+      {title:"Périmètre opérationnel",icon:"⚙️",fields:[
+        {id:"businessLines",label:"Secteurs d'activité & canaux dans le périmètre",type:"bizmatrix",required:true},
+        {id:"siteCount",label:"Nombre de sites prévus dans le périmètre",type:"select",required:true,options:["1 – Site unique","2–3 sites","4+ sites"]},
+        {id:"hasHardware",label:"Matériel physique requis ?",type:"select",required:true,options:["Oui – matériel requis","Non – aucun matériel nécessaire"]},
+        {id:"hardwareDetails",label:"Décrivez le matériel nécessaire",type:"textarea",required:true,placeholder:"ex. 2 imprimantes de reçus, 4 scanners portables, 3 terminaux de paiement, 1 imprimante d'étiquettes"},
+        {id:"peakVolume",label:"Contraintes d'entrée / capacité",type:"textarea",required:true,placeholder:"ex. Entrée par créneaux, 3 portiques indépendants, max 500/jour, aucune"}
+      ]},
+      {title:"Produits & Tarification",icon:"🎟️",fields:[
+        {id:"productTypes",label:"Types de produits / flux de réservation ?",type:"textarea",required:true,placeholder:"ex. Billets horodatés, abonnements, forfaits anniversaire, groupes"},
+        {id:"pricingComplexity",label:"Structure tarifaire et remises ?",type:"textarea",required:true,placeholder:"ex. Tarifs heures creuses/pleines, -10% membres, tarifs groupe, codes promo"},
+        {id:"accessControl",label:"Comment l'accès visiteurs est-il contrôlé aujourd'hui ?",type:"textarea",required:true,placeholder:"ex. Billet QR code, carte physique, tourniquet, aucun"}
+      ]},
+      {title:"Systèmes existants",icon:"🖥️",fields:[
+        {id:"existingSystems",label:"Tous les systèmes existants (un par ligne : Nom – Fonction)",type:"textarea",required:true,placeholder:"ex.\nParafait POS – billetterie & contrôle d'accès\nShopify – retail\nMailchimp – marketing"},
+        {id:"migrationNeeded",label:"Migration de données requise ?",type:"select",required:true,options:["Oui","Non"]},
+        {id:"migrationSystems",label:"Depuis quels systèmes les données seront-elles migrées ?",type:"textarea",required:false,placeholder:"ex. Parafait POS, Shopify, fichiers Excel internes"},
+        {id:"migrationData",label:"Quelles données seront migrées ?",type:"textarea",required:false,placeholder:"ex. Fiches clients, catalogue produits, données d'abonnements"},
+        {id:"migrationVolume",label:"Combien d'enregistrements approximativement ?",type:"text",required:false,placeholder:"ex. ~54 000 clients, ~200 produits"},
+        {id:"migrationPeriod",label:"Quelle période couvrent les données ?",type:"text",required:false,placeholder:"ex. 3 dernières années, tous les membres actifs, catalogue complet"},
+        {id:"cutovertStrategy",label:"Approche de basculement prévue ?",type:"select",required:true,options:["Big Bang – tout simultanément","Phasé – département par département","Pas encore défini"]}
+      ]},
+      {title:"Intégrations & Développement",icon:"🔗",fields:[
+        {id:"hasIntegrations",label:"Intégrations tierces requises ?",type:"select",required:true,options:["Oui","Non"]},
+        {id:"integrationSystem",label:"Quel système doit être intégré ?",type:"text",required:false,placeholder:"ex. Sage, Mailchimp, Salesforce, matériel de contrôle d'accès"},
+        {id:"integrationPurpose",label:"Quel est l'objectif de l'intégration ?",type:"textarea",required:false,placeholder:"ex. Export quotidien des ventes vers la comptabilité, synchronisation clients"},
+        {id:"integrationData",label:"Quelles données doivent circuler entre les systèmes ?",type:"textarea",required:false,placeholder:"ex. Totaux des ventes, nom & email client, statut de réservation"},
+        {id:"customDev",label:"Développement personnalisé requis ? (hors fonctionnalités existantes)",type:"select",required:true,options:["Oui","Non"]},
+        {id:"customDevDetails",label:"Décrivez chaque élément de développement",type:"textarea",required:false,placeholder:"ex.\n1. Flux décharge numérique – remplacer le tap carte par acceptation QR au portique\n2. Gestion guides – assigner des guides aux créneaux avec emails automatiques"}
+      ]},
+      {title:"Parties prenantes & Calendrier",icon:"👥",fields:[
+        {id:"clientDecisionMaker",label:"Décideur client (Nom, rôle, email)",type:"text",required:true,placeholder:"ex. Sophie Martin, Directrice Générale, s.martin@daytona.fr"},
+        {id:"clientTechnical",label:"Contact technique client",type:"text",required:false,placeholder:"ex. Paul Durand, Responsable IT, p.durand@daytona.fr"},
+        {id:"clientProject",label:"Contact projet client",type:"text",required:false,placeholder:"ex. Claire Petit, Responsable Opérations, c.petit@daytona.fr"},
+        {id:"implManager",label:"Chef de projet Smeetz (Nom, email)",type:"text",required:false,placeholder:"ex. Marc Dubois, m.dubois@smeetz.com"},
+        {id:"salesPerson",label:"Commercial Smeetz (Nom, email)",type:"text",required:false,placeholder:"ex. Anna Becker, a.becker@smeetz.com"},
+        {id:"phaseDiscoveryStart",label:"Discovery – Date de début",type:"text",required:false,placeholder:"ex. 1 juin 2025"},
+        {id:"phaseDiscoveryEnd",label:"Discovery – Date de fin",type:"text",required:false,placeholder:"ex. 15 juin 2025"},
+        {id:"phaseImplStart",label:"Implémentation – Date de début",type:"text",required:true,placeholder:"ex. 16 juin 2025"},
+        {id:"phaseImplEnd",label:"Implémentation – Date de fin",type:"text",required:false,placeholder:"ex. 31 juillet 2025"},
+        {id:"phaseTestStart",label:"Tests – Date de début",type:"text",required:false,placeholder:"ex. 1 août 2025"},
+        {id:"phaseTestEnd",label:"Tests – Date de fin",type:"text",required:false,placeholder:"ex. 20 août 2025"},
+        {id:"targetGoLive",label:"Go-Live – Date cible",type:"text",required:true,placeholder:"ex. 1er septembre 2025"},
+      ]},
+      {title:"Objectifs & Risques",icon:"🎯",fields:[
+        {id:"objectives",label:"Principaux objectifs métier ?",type:"textarea",required:true,placeholder:"ex. Remplacer Parafait, unifier ventes online/on-site, activer la pré-réservation"},
+        {id:"outOfScope",label:"Éléments explicitement hors périmètre ?",type:"textarea",required:false,placeholder:"ex. Planification RH, programme de fidélité, distribution OTA"},
+        {id:"openPoints",label:"Points encore inconnus ou en discussion ?",type:"textarea",required:false,placeholder:"ex. Système Diner séparé ? Historique réservations TBC"},
+        {id:"keyRisks",label:"Risques ou dépendances connus ?",type:"textarea",required:false,placeholder:"ex. Documentation Parafait manquante, ressources IT limitées, deadline fixe"}
+      ]}
+    ]
+  },
+  de:{
+    langLabel:"🇩🇪 Deutsch",appSubtitle:"Übergabe-Tool Vertrieb → Implementierung",
+    stepOf:(a,b)=>`Schritt ${a} von ${b}`,complete:"% abgeschlossen",back:"← Zurück",next:"Weiter →",
+    generate:"✨ Scoping-Dokument erstellen",select:"— Auswählen —",
+    generating:"Dokument wird erstellt…",classifiedAs:"AUTOMATISCH KLASSIFIZIERT ALS",
+    copyMd:"📋 Markdown kopieren",copied:"✓ Kopiert!",newProject:"+ Neues Projekt",
+    downloadDocx:"⬇️ .docx herunterladen",downloading:"Wird vorbereitet…",
+    docxHint:"In Google Drive hochladen → direkt in Google Docs bearbeiten",
+    bizLinesHint:"Wählen Sie die Geschäftsbereiche und Kanäle die im Scope sind",
+    steps:[
+      {title:"Kundenübersicht",icon:"🏢",fields:[
+        {id:"clientName",label:"Kundenname",type:"text",required:true,placeholder:"z. B. Daytona Entertainment GmbH"},
+        {id:"website",label:"Website-URL",type:"text",required:false,placeholder:"z. B. https://www.daytona.de"},
+        {id:"clientType",label:"Vertical / Art des Unternehmens",type:"select",required:true,options:["Freizeitparks","Zoos & Aquarien","Museen & Kulturstätten","Familienunterhaltungszentren","Theater & Live-Entertainment & Events","Andere Erlebnisangebote"]},
+        {id:"clientTypeOther",label:"Bitte beschreiben Sie Ihr Angebot",type:"text",required:false,placeholder:"z. B. Indoor-Kart- und Spielhallenzentrum"},
+        {id:"physicalScope",label:"Physische Struktur",type:"textarea",required:true,placeholder:"z. B. Einzelstandort in Berlin. Ticketschalter, 2 Retail-Kioske, Restaurant und 3 Eingangs-Drehkreuze."}
+      ]},
+      {title:"Betrieblicher Umfang",icon:"⚙️",fields:[
+        {id:"businessLines",label:"Geschäftsbereiche & Kanäle im Scope",type:"bizmatrix",required:true},
+        {id:"siteCount",label:"Anzahl der geplanten Standorte im Scope",type:"select",required:true,options:["1 – Einzelstandort","2–3 Standorte","4+ Standorte"]},
+        {id:"hasHardware",label:"Wird Hardware benötigt?",type:"select",required:true,options:["Ja – Hardware wird benötigt","Nein – keine Hardware benötigt"]},
+        {id:"hardwareDetails",label:"Falls ja, Hardware beschreiben",type:"textarea",required:true,placeholder:"z. B. 2 Bondrucker, 4 mobile Scanner, 3 Kartenzahlungsterminals, 1 Etikettendrucker"},
+        {id:"peakVolume",label:"Einlass- / Kapazitätsbeschränkungen",type:"textarea",required:true,placeholder:"z. B. Zeitfenster-Einlass, 3 Eingangstore, max. 500/Tag, keine"}
+      ]},
+      {title:"Produkte & Preise",icon:"🎟️",fields:[
+        {id:"productTypes",label:"Welche Produkte / Buchungsabläufe gibt es?",type:"textarea",required:true,placeholder:"z. B. Eintrittskarten, Jahresmitgliedschaften, Geburtstagspackages, Gruppenreservierungen"},
+        {id:"pricingComplexity",label:"Preis- und Rabattstruktur?",type:"textarea",required:true,placeholder:"z. B. Hoch-/Nebensaisonpreise, 10% Mitgliederrabatt, Gruppenpreise, Aktionscodes"},
+        {id:"accessControl",label:"Wie wird der Besucherzugang heute kontrolliert?",type:"textarea",required:true,placeholder:"z. B. QR-Code Ticket, physische Karte, Drehkreuz, keine"}
+      ]},
+      {title:"Systemlandschaft",icon:"🖥️",fields:[
+        {id:"existingSystems",label:"Alle aktuellen Systeme (eines pro Zeile: Name – Funktion)",type:"textarea",required:true,placeholder:"z. B.\nParafait POS – Ticketing & Zugangskontrolle\nShopify – Retail\nMailchimp – Marketing"},
+        {id:"migrationNeeded",label:"Datenmigration erforderlich?",type:"select",required:true,options:["Ja","Nein"]},
+        {id:"migrationSystems",label:"Aus welchen Systemen werden die Daten migriert?",type:"textarea",required:false,placeholder:"z. B. Parafait POS, Shopify, interne Excel-Dateien"},
+        {id:"migrationData",label:"Welche Daten werden migriert?",type:"textarea",required:false,placeholder:"z. B. Kundendaten, Produktkatalog, Mitgliedschaftsdaten"},
+        {id:"migrationVolume",label:"Wie viele Datensätze ungefähr?",type:"text",required:false,placeholder:"z. B. ~54.000 Kundendatensätze, ~200 Produkte"},
+        {id:"migrationPeriod",label:"Welchen Zeitraum decken die Daten ab?",type:"text",required:false,placeholder:"z. B. Letzte 3 Jahre, alle aktiven Mitglieder, vollständiger Katalog"},
+        {id:"cutovertStrategy",label:"Geplante Umstellungsstrategie?",type:"select",required:true,options:["Big Bang – alles gleichzeitig","Phasenweise – Abteilung für Abteilung","Noch nicht festgelegt"]}
+      ]},
+      {title:"Integrationen & Entwicklung",icon:"🔗",fields:[
+        {id:"hasIntegrations",label:"Drittanbieter-Integrationen erforderlich?",type:"select",required:true,options:["Ja","Nein"]},
+        {id:"integrationSystem",label:"Welches System soll integriert werden?",type:"text",required:false,placeholder:"z. B. Sage, Mailchimp, Salesforce, Zugangskontroll-Hardware"},
+        {id:"integrationPurpose",label:"Was ist der Zweck der Integration?",type:"textarea",required:false,placeholder:"z. B. Täglicher Verkaufsexport in die Buchhaltung, Kundensynchronisierung für Marketing"},
+        {id:"integrationData",label:"Welche Daten sollen zwischen den Systemen fließen?",type:"textarea",required:false,placeholder:"z. B. Umsatzzahlen, Kundenname & E-Mail, Buchungsstatus, Mitgliedschaftsstufe"},
+        {id:"customDev",label:"Individuelle Entwicklung erforderlich? (außerhalb bestehender Smeetz-Funktionen)",type:"select",required:true,options:["Ja","Nein"]},
+        {id:"customDevDetails",label:"Falls ja, jeden Entwicklungspunkt genau beschreiben",type:"textarea",required:false,placeholder:"z. B.\n1. Digitaler Haftungsflow – physische Karte durch QR-gestützte Unterschrift ersetzen\n2. Guide-Management – Guides zu Zeitslots zuweisen, automatische Briefing-E-Mails"}
+      ]},
+      {title:"Stakeholder & Zeitplan",icon:"👥",fields:[
+        {id:"clientDecisionMaker",label:"Entscheidungsträger Kunde (Name, Rolle, E-Mail)",type:"text",required:true,placeholder:"z. B. Thomas Müller, Geschäftsführer, t.mueller@daytona.de"},
+        {id:"clientTechnical",label:"Technischer Ansprechpartner Kunde",type:"text",required:false,placeholder:"z. B. Jana Krause, IT-Leiterin, j.krause@daytona.de"},
+        {id:"clientProject",label:"Projektansprechpartner Kunde",type:"text",required:false,placeholder:"z. B. Markus Weber, Betriebsleiter, m.weber@daytona.de"},
+        {id:"implManager",label:"Smeetz Implementierungsmanager (Name, E-Mail)",type:"text",required:false,placeholder:"z. B. Marc Dubois, m.dubois@smeetz.com"},
+        {id:"salesPerson",label:"Smeetz Vertrieb (Name, E-Mail)",type:"text",required:false,placeholder:"z. B. Anna Becker, a.becker@smeetz.com"},
+        {id:"phaseDiscoveryStart",label:"Discovery – Startdatum",type:"text",required:false,placeholder:"z. B. 1. Juni 2025"},
+        {id:"phaseDiscoveryEnd",label:"Discovery – Enddatum",type:"text",required:false,placeholder:"z. B. 15. Juni 2025"},
+        {id:"phaseImplStart",label:"Implementierung – Startdatum",type:"text",required:true,placeholder:"z. B. 16. Juni 2025"},
+        {id:"phaseImplEnd",label:"Implementierung – Enddatum",type:"text",required:false,placeholder:"z. B. 31. Juli 2025"},
+        {id:"phaseTestStart",label:"Testing – Startdatum",type:"text",required:false,placeholder:"z. B. 1. August 2025"},
+        {id:"phaseTestEnd",label:"Testing – Enddatum",type:"text",required:false,placeholder:"z. B. 20. August 2025"},
+        {id:"targetGoLive",label:"Go-Live – Zieldatum",type:"text",required:true,placeholder:"z. B. 1. September 2025"},
+      ]},
+      {title:"Ziele & Risiken",icon:"🎯",fields:[
+        {id:"objectives",label:"Wichtigste Geschäftsziele?",type:"textarea",required:true,placeholder:"z. B. Parafait ersetzen, Online- und Vor-Ort-Verkäufe vereinheitlichen, Online-Buchung aktivieren"},
+        {id:"outOfScope",label:"Explizit nicht im Scope?",type:"textarea",required:false,placeholder:"z. B. Personalplanung, Treueprogramm, OTA-Distribution"},
+        {id:"openPoints",label:"Noch unbekannte oder offene Punkte?",type:"textarea",required:false,placeholder:"z. B. Diner-System separat? Online-Buchungshistorie TBC"},
+        {id:"keyRisks",label:"Bekannte Risiken oder Abhängigkeiten?",type:"textarea",required:false,placeholder:"z. B. API-Dokumentation fehlt, IT-Ressourcen begrenzt, fixer Go-Live-Termin"}
+      ]}
+    ]
+  },
+  es:{
+    langLabel:"🇪🇸 Español",appSubtitle:"Herramienta de traspaso Ventas → Implementación",
+    stepOf:(a,b)=>`Paso ${a} de ${b}`,complete:"% completado",back:"← Atrás",next:"Siguiente →",
+    generate:"✨ Generar documento de alcance",select:"— Seleccionar —",
+    generating:"Generando documento…",classifiedAs:"CLASIFICADO AUTOMÁTICAMENTE",
+    copyMd:"📋 Copiar Markdown",copied:"✓ ¡Copiado!",newProject:"+ Nuevo proyecto",
+    downloadDocx:"⬇️ Descargar .docx",downloading:"Preparando…",
+    docxHint:"Sube a Google Drive → se abre en Google Docs para editar",
+    bizLinesHint:"Marca las líneas de negocio y canales en el alcance",
+    steps:[
+      {title:"Resumen del cliente",icon:"🏢",fields:[
+        {id:"clientName",label:"Nombre del cliente",type:"text",required:true,placeholder:"ej. Daytona Entertainment S.L."},
+        {id:"website",label:"Sitio web",type:"text",required:false,placeholder:"ej. https://www.daytona.es"},
+        {id:"clientType",label:"Vertical / Tipo de negocio",type:"select",required:true,options:["Parques de atracciones","Zoos & Acuarios","Museos & Patrimonio","Centros de entretenimiento familiar","Teatros & Espectáculos en vivo & Eventos","Otra experiencia"]},
+        {id:"clientTypeOther",label:"Describe tu experiencia",type:"text",required:false,placeholder:"ej. Centro indoor de karting y recreativos"},
+        {id:"physicalScope",label:"Configuración física",type:"textarea",required:true,placeholder:"ej. Sede única en Madrid. Taquilla principal, 2 quioscos retail, restaurante y 3 tornos de entrada."}
+      ]},
+      {title:"Alcance operacional",icon:"⚙️",fields:[
+        {id:"businessLines",label:"Líneas de negocio y canales en el alcance",type:"bizmatrix",required:true},
+        {id:"siteCount",label:"Número de ubicaciones previstas en el alcance",type:"select",required:true,options:["1 – Ubicación única","2–3 ubicaciones","4+ ubicaciones"]},
+        {id:"hasHardware",label:"¿Se requiere hardware físico?",type:"select",required:true,options:["Sí – se necesita hardware","No – sin hardware necesario"]},
+        {id:"hardwareDetails",label:"Describa el hardware necesario",type:"textarea",required:true,placeholder:"ej. 2 impresoras de recibos, 4 escáneres portátiles, 3 terminales de pago, 1 impresora de etiquetas"},
+        {id:"peakVolume",label:"Restricciones de acceso / capacidad",type:"textarea",required:true,placeholder:"ej. Entrada por franjas, 3 accesos independientes, aforo máx. 500/día, ninguna"}
+      ]},
+      {title:"Productos & Precios",icon:"🎟️",fields:[
+        {id:"productTypes",label:"¿Qué tipos de productos / flujos de reserva existen?",type:"textarea",required:true,placeholder:"ej. Entradas con hora, membresías, paquetes de cumpleaños, grupos"},
+        {id:"pricingComplexity",label:"¿Estructura de precios y descuentos?",type:"textarea",required:true,placeholder:"ej. Precios temporada alta/baja, -10% socios, tarifas grupo, códigos promo"},
+        {id:"accessControl",label:"¿Cómo se controla el acceso hoy?",type:"textarea",required:true,placeholder:"ej. Ticket QR, tarjeta física, torno, ninguno"}
+      ]},
+      {title:"Sistemas actuales",icon:"🖥️",fields:[
+        {id:"existingSystems",label:"Todos los sistemas actuales (uno por línea: Nombre – Función)",type:"textarea",required:true,placeholder:"ej.\nParafait POS – taquilla & control acceso\nShopify – retail\nMailchimp – marketing"},
+        {id:"migrationNeeded",label:"¿Se requiere migración de datos?",type:"select",required:true,options:["Sí","No"]},
+        {id:"migrationSystems",label:"¿Desde qué sistemas se migrarán los datos?",type:"textarea",required:false,placeholder:"ej. Parafait POS, Shopify, hojas de cálculo Excel"},
+        {id:"migrationData",label:"¿Qué datos se migrarán?",type:"textarea",required:false,placeholder:"ej. Registros de clientes, catálogo de productos, datos de membresías"},
+        {id:"migrationVolume",label:"¿Cuántos registros aproximadamente?",type:"text",required:false,placeholder:"ej. ~54.000 clientes, ~200 productos"},
+        {id:"migrationPeriod",label:"¿Qué período cubren los datos?",type:"text",required:false,placeholder:"ej. Últimos 3 años, todos los socios activos, catálogo completo"},
+        {id:"cutovertStrategy",label:"¿Enfoque de transición previsto?",type:"select",required:true,options:["Big Bang – todo a la vez","Por fases – departamento a departamento","Aún no definido"]}
+      ]},
+      {title:"Integraciones & Desarrollo",icon:"🔗",fields:[
+        {id:"hasIntegrations",label:"¿Se requieren integraciones con terceros?",type:"select",required:true,options:["Sí","No"]},
+        {id:"integrationSystem",label:"¿Qué sistema debe integrarse?",type:"text",required:false,placeholder:"ej. Sage, Mailchimp, Salesforce, hardware de control de acceso"},
+        {id:"integrationPurpose",label:"¿Cuál es el objetivo de la integración?",type:"textarea",required:false,placeholder:"ej. Exportación diaria de ventas a contabilidad, sincronización clientes"},
+        {id:"integrationData",label:"¿Qué datos deben fluir entre los sistemas?",type:"textarea",required:false,placeholder:"ej. Totales de ventas, nombre y email del cliente, estado de reserva"},
+        {id:"customDev",label:"¿Desarrollo personalizado requerido? (fuera de funcionalidad existente)",type:"select",required:true,options:["Sí","No"]},
+        {id:"customDevDetails",label:"Describe cada elemento de desarrollo",type:"textarea",required:false,placeholder:"ej.\n1. Flujo digital de exención – reemplazar tarjeta por QR en el acceso\n2. Gestión de guías – asignar guías a franjas con emails automáticos"}
+      ]},
+      {title:"Partes interesadas & Cronograma",icon:"👥",fields:[
+        {id:"clientDecisionMaker",label:"Responsable de decisiones (Nombre, rol, email)",type:"text",required:true,placeholder:"ej. Carlos Gómez, Director General, c.gomez@daytona.es"},
+        {id:"clientTechnical",label:"Contacto técnico del cliente",type:"text",required:false,placeholder:"ej. Marta López, Responsable IT, m.lopez@daytona.es"},
+        {id:"clientProject",label:"Contacto de proyecto del cliente",type:"text",required:false,placeholder:"ej. Javier Ruiz, Jefe de Operaciones, j.ruiz@daytona.es"},
+        {id:"implManager",label:"Gestor de implementación Smeetz (Nombre, email)",type:"text",required:false,placeholder:"ej. Marc Dubois, m.dubois@smeetz.com"},
+        {id:"salesPerson",label:"Comercial Smeetz (Nombre, email)",type:"text",required:false,placeholder:"ej. Anna Becker, a.becker@smeetz.com"},
+        {id:"phaseDiscoveryStart",label:"Discovery – Fecha de inicio",type:"text",required:false,placeholder:"ej. 1 de junio de 2025"},
+        {id:"phaseDiscoveryEnd",label:"Discovery – Fecha de fin",type:"text",required:false,placeholder:"ej. 15 de junio de 2025"},
+        {id:"phaseImplStart",label:"Implementación – Fecha de inicio",type:"text",required:true,placeholder:"ej. 16 de junio de 2025"},
+        {id:"phaseImplEnd",label:"Implementación – Fecha de fin",type:"text",required:false,placeholder:"ej. 31 de julio de 2025"},
+        {id:"phaseTestStart",label:"Testing – Fecha de inicio",type:"text",required:false,placeholder:"ej. 1 de agosto de 2025"},
+        {id:"phaseTestEnd",label:"Testing – Fecha de fin",type:"text",required:false,placeholder:"ej. 20 de agosto de 2025"},
+        {id:"targetGoLive",label:"Go-Live – Fecha objetivo",type:"text",required:true,placeholder:"ej. 1 de septiembre de 2025"},
+      ]},
+      {title:"Objetivos & Riesgos",icon:"🎯",fields:[
+        {id:"objectives",label:"¿Principales objetivos de negocio?",type:"textarea",required:true,placeholder:"ej. Reemplazar Parafait, unificar ventas online/presencial, activar reservas online"},
+        {id:"outOfScope",label:"¿Elementos explícitamente fuera del alcance?",type:"textarea",required:false,placeholder:"ej. Planificación RRHH, programa de fidelización, distribución OTA"},
+        {id:"openPoints",label:"¿Qué sigue desconocido o en discusión?",type:"textarea",required:false,placeholder:"ej. ¿Sistema Diner separado? Historial reservas TBC"},
+        {id:"keyRisks",label:"¿Riesgos o dependencias conocidos?",type:"textarea",required:false,placeholder:"ej. Documentación legacy incompleta, IT limitado, fecha go-live fija"}
+      ]}
+    ]
+  }
+};
+
+function classify(a){
+  let s={online:0,standard:0,advanced:0};
+  const bl=a.businessLines||{};
+  const active=BIZ_LINES.filter(l=>CHANNELS.some(c=>bl[l.id]&&bl[l.id][c]));
+  if(active.length>=3)s.advanced+=3; else if(active.length===2)s.standard+=2; else s.online+=2;
+  const hasOnsite=BIZ_LINES.some(l=>bl[l.id]&&bl[l.id]["Onsite"]);
+  const hasOnline=BIZ_LINES.some(l=>bl[l.id]&&bl[l.id]["Online"]);
+  if(hasOnsite&&hasOnline)s.standard+=2; else if(!hasOnsite)s.online+=3;
+  if((a.siteCount||"").includes("4+"))s.advanced+=3; else if((a.siteCount||"").includes("2"))s.advanced+=2; else s.standard+=1;
+  const hw=a.hasHardware||"";
+  if(hw.startsWith("Yes")||hw.startsWith("Ja")||hw.startsWith("Oui")||hw.startsWith("Sí"))s.standard+=2; else s.online+=2;
+  const integ=a.hasIntegrations||"";
+  if(integ==="Yes"||integ==="Ja"||integ==="Oui"||integ==="Sí")s.advanced+=2;
+  if(["Yes","Oui","Ja","Sí"].includes(a.customDev))s.advanced+=3;
+  const mig=a.migrationNeeded||"";
+  if(mig==="Yes"||mig==="Oui"||mig==="Ja"||mig==="Sí")s.advanced+=2;
+  if((a.cutovertStrategy||"").toLowerCase().includes("phas"))s.advanced+=2; else if((a.cutovertStrategy||"").toLowerCase().includes("bang"))s.standard+=1;
+  if((a.phasedRollout||"").toLowerCase().includes("phas"))s.advanced+=2;
+  const max=Math.max(s.online,s.standard,s.advanced);
+  return s.advanced===max?"Advanced":s.standard===max?"Standard":"Online";
+}
+
+function fmtBiz(bl){
+  if(!bl)return"Not specified";
+  return BIZ_LINES.map(l=>{const ac=CHANNELS.filter(c=>bl[l.id]&&bl[l.id][c]);return ac.length?l.label+": "+ac.join(" + "):null;}).filter(Boolean).join("; ")||"None";
+}
+
+function extractName(str){
+  if(!str)return"—";
+  return str.split(",")[0].trim();
+}
+
+function prompt(a,cls){
+  const hasCD=["Yes","Oui","Ja","Sí"].includes(a.customDev);
+  const clientSignerName=extractName(a.clientDecisionMaker);
+  const implMgrName=extractName(a.implManager);
+  const salesName=extractName(a.salesPerson);
+
+  return `You are a Smeetz implementation consultant. Generate a complete Smeetz Implementation Charter & Scoping Document in Markdown. English only. Concise: short sentences, bullets over paragraphs, max 5–8 lines per section unless a table needs more.
+
+# Smeetz Implementation Charter & Scoping Document
+## ${cls} Implementation – ${a.clientName||"[Client]"}
+## 1. Client Overview
+## 2. Implementation Classification
+## 3. Business Objectives & Success Criteria
+## 4. Stakeholders & Governance
+(table: Role | Name — include all contacts + Nicolette Jochelson as Project Sponsor)
+## 5. Current System Landscape
+### Existing Systems
+(table: System | Function | Smeetz Action | Notes)
+### Cutover Strategy
+## 6. Current Operational Model
+#### Products & Booking Flows
+#### Pricing & Discounts
+#### Onsite Constraints
+#### Capacity & Access
+## 7. Hardware Requirements
+## 8. In Scope
+### Business Lines & Channels
+(table: Business Line | Onsite | Online — ✅ or ➖)
+### Core Configuration
+### Key Integrations
+### Data Migration & Readiness
+## 9. In-Scope Configuration Items
+(Standard Smeetz setup — not custom dev. Table: Configuration Item | Area | Owner | Target Date)
+${hasCD?`## ⚠️ 10. Custom Development Items — ADDITIONAL SCOPE\n> **This project includes custom development outside standard Smeetz functionality. Requires product team validation and may impact timeline and commercial terms.**\n(table: Item | Description | Estimated Effort | Deadline | Priority)`:`## 10. Custom Development Items\nNo custom development required.`}
+## 11. Out of Scope
+(Always include: Personnel & HR, Advanced Offer Resource Management, Advanced Reporting & KPI Customisation, Surveys & Feedback, Future roadmap — plus client-specific)
+## 12. Milestones & Timeline
+(table: Phase | Milestone | Activity | Start | End)
+## 13. Data Migration Scope
+## 14. Testing & Training
+## 15. Go-Live & Support Model
+### Go-Live Strategy
+### Go-Live Readiness Checklist
+### Definition of "Live & Done"
+## 16. Assumptions, Risks & Open Points
+### Key Assumptions (table: Topic | Assumption)
+### Key Risks (table: Risk | Description)
+### Open Points
+## 17. Handover Confirmation
+Sales Handover Completed: ☐  Client Acceptance: ☐  Implementation Acceptance: ☐
+## 18. Document Sign-Off
+
+By signing below, all parties confirm they have read, understood, and agreed to the scope, objectives, and terms set out in this Implementation Charter.
+
+Generate a sign-off table with EXACTLY these three rows and four columns:
+
+| Role | Name | Signature | Date |
+|---|---|---|---|
+| Client – ${clientSignerName} | ${clientSignerName} | ______________________________ | ____________ |
+| Smeetz Sales – ${salesName} | ${salesName} | ______________________________ | ____________ |
+| Smeetz Implementation Manager – ${implMgrName} | ${implMgrName} | ______________________________ | ____________ |
+
+After the table add this note on its own line:
+> *Signed copies to be retained by Smeetz Implementation team and the Client.*
+
+CLIENT DATA:
+- Client: ${a.clientName||"TBC"} | Vertical: ${a.clientType||"TBC"}${a.clientTypeOther?" ("+a.clientTypeOther+")":""} | Web: ${a.website||"—"}
+- Physical scope: ${a.physicalScope||"TBC"}
+- Business lines: ${fmtBiz(a.businessLines)}
+- Sites: ${a.siteCount||"TBC"} | Hardware: ${a.hasHardware||"TBC"}${a.hardwareDetails?" – "+a.hardwareDetails:""}
+- Entry/capacity: ${a.peakVolume||"—"}
+- Products: ${a.productTypes||"TBC"} | Pricing: ${a.pricingComplexity||"TBC"} | Access: ${a.accessControl||"—"}
+- Systems: ${a.existingSystems||"TBC"} | Cutover: ${a.cutovertStrategy||"TBC"}
+- Migration: ${a.migrationNeeded||"TBC"} | From: ${a.migrationSystems||"—"} | Data: ${a.migrationData||"—"} | Volume: ${a.migrationVolume||"—"} | Period: ${a.migrationPeriod||"—"}
+- Integrations: ${a.hasIntegrations||"TBC"} | System: ${a.integrationSystem||"—"} | Purpose: ${a.integrationPurpose||"—"} | Data flow: ${a.integrationData||"—"}
+- Custom dev: ${a.customDev||"TBC"}${a.customDevDetails?" – "+a.customDevDetails:""}
+- Decision maker: ${a.clientDecisionMaker||"TBC"} | Technical: ${a.clientTechnical||"—"} | Project: ${a.clientProject||"—"}
+- Impl mgr: ${a.implManager||"—"} | Sales: ${a.salesPerson||"—"}
+- Go-live: ${a.targetGoLive||"TBC"}
+- Timeline phases (use these exact dates in Section 12 milestone table):
+  Discovery: ${a.phaseDiscoveryStart||"TBC"} → ${a.phaseDiscoveryEnd||"TBC"}
+  Implementation: ${a.phaseImplStart||"TBC"} → ${a.phaseImplEnd||"TBC"}
+  ${hasCD?"Development: include as a phase between Implementation and Testing, dates to be defined":""}
+  Testing: ${a.phaseTestStart||"TBC"} → ${a.phaseTestEnd||"TBC"}
+  Go-Live: ${a.targetGoLive||"TBC"}
+- Objectives: ${a.objectives||"TBC"} | OOS: ${a.outOfScope||"—"} | Open: ${a.openPoints||"—"} | Risks: ${a.keyRisks||"—"}
+CLASSIFICATION: ${cls}`;
+}
+
+function mdToDocx(md){
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function runs(t){return t.split(/(\*\*.*?\*\*)/).map(p=>p.startsWith("**")&&p.endsWith("**")?'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">'+esc(p.slice(2,-2))+'</w:t></w:r>':p?'<w:r><w:t xml:space="preserve">'+esc(p)+'</w:t></w:r>':"").join("");}
+  function trow(cells,hdr){const shd=hdr?'<w:shd w:val="clear" w:fill="1E3A5F"/>':"";const rpr=hdr?'<w:b/><w:color w:val="FFFFFF"/>':"";return'<w:tr>'+cells.map(c=>'<w:tc><w:tcPr>'+shd+'<w:tcW w:w="0" w:type="auto"/></w:tcPr><w:p><w:pPr><w:spacing w:after="60"/></w:pPr><w:r><w:rPr>'+rpr+'<w:sz w:val="18"/></w:rPr><w:t xml:space="preserve">'+esc(c.trim())+'</w:t></w:r></w:p></w:tc>').join('')+'</w:tr>';}
+  const lines=md.split("\n");let xml="",inT=false,txml="";
+  function closeT(){if(inT){xml+=txml+"</w:tbl>";inT=false;txml="";}}
+  function p(c,sz,bold,color,after){return'<w:p><w:pPr><w:spacing w:after="'+(after||120)+'"/></w:pPr><w:r><w:rPr>'+(bold?"<w:b/>":"")+'<w:color w:val="'+(color||"000000")+'"/><w:sz w:val="'+(sz||22)+'"/></w:rPr><w:t xml:space="preserve">'+c+'</w:t></w:r></w:p>';}
+  lines.forEach((line,i)=>{
+    const next=lines[i+1]||"";
+    if(line.match(/^\|[-| ]+\|$/))return;
+    if(line.startsWith("|")){const cells=line.split("|").slice(1,-1);if(!inT){closeT();inT=true;txml='<w:tbl><w:tblPr><w:tblW w:w="9200" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="CCCCCC"/><w:left w:val="single" w:sz="4" w:color="CCCCCC"/><w:bottom w:val="single" w:sz="4" w:color="CCCCCC"/><w:right w:val="single" w:sz="4" w:color="CCCCCC"/><w:insideH w:val="single" w:sz="4" w:color="CCCCCC"/><w:insideV w:val="single" w:sz="4" w:color="CCCCCC"/></w:tblBorders></w:tblPr>';}txml+=trow(cells,!!next.match(/^\|[-| ]+\|$/));return;}
+    closeT();
+    if(line.startsWith("# "))xml+=p(esc(line.slice(2)),36,true,"1E3A5F",240);
+    else if(line.startsWith("## ⚠")){xml+='<w:p><w:pPr><w:spacing w:after="60"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="C0392B"/><w:sz w:val="28"/></w:rPr><w:t xml:space="preserve">'+esc(line.replace(/^##\s*/,""))+'</w:t></w:r></w:p><w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:color="C0392B"/></w:pBdr><w:spacing w:after="80"/></w:pPr></w:p>';}
+    else if(line.startsWith("## "))xml+=p(esc(line.slice(3)),28,true,"1E3A5F",60)+'<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:color="00B4D8"/></w:pBdr><w:spacing w:after="80"/></w:pPr></w:p>';
+    else if(line.startsWith("### "))xml+=p(esc(line.slice(4)),24,true,"0077A8",80);
+    else if(line.startsWith("#### "))xml+='<w:p><w:pPr><w:spacing w:after="60"/></w:pPr><w:r><w:rPr><w:b/><w:i/><w:sz w:val="22"/></w:rPr><w:t>'+esc(line.slice(5))+'</w:t></w:r></w:p>';
+    else if(line.startsWith("> "))xml+='<w:p><w:pPr><w:pBdr><w:left w:val="single" w:sz="8" w:color="C0392B"/></w:pBdr><w:ind w:left="360"/><w:spacing w:after="80"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="C0392B"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">'+esc(line.slice(2))+'</w:t></w:r></w:p>';
+    else if(line.startsWith("- "))xml+='<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr><w:spacing w:after="60"/></w:pPr>'+runs(line.slice(2))+'</w:p>';
+    else if(line.trim()==="")xml+='<w:p><w:pPr><w:spacing w:after="80"/></w:pPr></w:p>';
+    else xml+='<w:p><w:pPr><w:spacing w:after="80"/></w:pPr>'+runs(line)+'</w:p>';
+  });
+  closeT();
+  const doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+xml+'<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>';
+  const rels='<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/></Relationships>';
+  const styles='<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>';
+  const numbering='<?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num></w:numbering>';
+  const ct='<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>';
+  const rr='<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  return{doc,rels,styles,numbering,ct,rr};
+}
+
+async function dlDocx(md,name){
+  if(!window.fflate){
+    await new Promise((res,rej)=>{
+      const s=document.createElement("script");
+      s.src="https://cdnjs.cloudflare.com/ajax/libs/fflate/0.8.2/fflate.min.js";
+      s.onload=res;s.onerror=rej;
+      document.head.appendChild(s);
+    });
+  }
+  const{doc,rels,styles,numbering,ct,rr}=mdToDocx(md);
+  const e=str=>new TextEncoder().encode(str);
+  const z=fflate.zipSync({
+    "[Content_Types].xml":e(ct),
+    "_rels/.rels":e(rr),
+    "word/document.xml":e(doc),
+    "word/_rels/document.xml.rels":e(rels),
+    "word/styles.xml":e(styles),
+    "word/numbering.xml":e(numbering)
+  });
+  const blob=new Blob([z],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="Smeetz_Scoping_"+((name||"Client").replace(/\s+/g,"_"))+".docx";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function BizMatrix({value,onChange}){
+  const v=value||{};
+  function toggle(lid,ch){const prev=v[lid]||{};onChange({...v,[lid]:{...prev,[ch]:!prev[ch]}});}
+  const any=BIZ_LINES.some(l=>CHANNELS.some(c=>v[l.id]&&v[l.id][c]));
+  return(<div>
+    <table style={{width:"100%",borderCollapse:"collapse"}}>
+      <thead><tr>
+        <th style={{padding:"8px 12px",textAlign:"left",background:"#1e3a5f",color:"#fff",fontSize:13}}>Business Line</th>
+        {CHANNELS.map(c=><th key={c} style={{padding:"8px 16px",textAlign:"center",background:"#1e3a5f",color:"#fff",fontSize:13}}>{c}</th>)}
+      </tr></thead>
+      <tbody>{BIZ_LINES.map((l,i)=>(
+        <tr key={l.id} style={{background:i%2===0?"#f9fafb":"#fff"}}>
+          <td style={{padding:"10px 12px",fontWeight:600,fontSize:13,color:"#374151",borderBottom:"1px solid #e5e7eb"}}>{l.label}</td>
+          {CHANNELS.map(c=>{const active=v[l.id]&&v[l.id][c];return(
+            <td key={c} style={{textAlign:"center",borderBottom:"1px solid #e5e7eb"}}>
+              <button onClick={()=>toggle(l.id,c)} style={{width:34,height:34,borderRadius:8,border:"2px solid "+(active?"#00b4d8":"#e5e7eb"),background:active?"#00b4d8":"#fff",color:active?"#fff":"#ccc",fontSize:16,cursor:"pointer"}}>{active?"✓":""}</button>
+            </td>);})}
+        </tr>
+      ))}</tbody>
+    </table>
+    {!any&&<p style={{fontSize:12,color:"#ef4444",marginTop:6}}>Please select at least one business line and channel.</p>}
+  </div>);
+}
+
+function App(){
+  const [lang,setLang]=useState(null);
+  const [step,setStep]=useState(0);
+  const [ans,setAns]=useState({});
+  const [loading,setLoading]=useState(false);
+  const [doc,setDoc]=useState(null);
+  const [cls,setCls]=useState(null);
+  const [copied,setCopied]=useState(false);
+  const [dlLoad,setDlLoad]=useState(false);
+
+  const t=lang?T[lang]:null;
+  const STEPS=t?t.steps:[];
+  const cur=STEPS[step];
+
+  function chg(id,val){setAns(p=>({...p,[id]:val}));}
+
+  function visible(f){
+    if(f.id==="hardwareDetails"){const h=ans.hasHardware||"";return h.startsWith("Yes")||h.startsWith("Ja")||h.startsWith("Oui")||h.startsWith("Sí");}
+    if(f.id==="customDevDetails"){const c=ans.customDev||"";return c==="Yes"||c==="Ja"||c==="Oui"||c==="Sí";}
+    if(f.id==="integrationSystem"||f.id==="integrationPurpose"||f.id==="integrationData"){const i=ans.hasIntegrations||"";return i==="Yes"||i==="Ja"||i==="Oui"||i==="Sí";}
+    if(["migrationSystems","migrationData","migrationVolume","migrationPeriod"].includes(f.id)){const m=ans.migrationNeeded||"";return m==="Yes"||m==="Ja"||m==="Oui"||m==="Sí";}
+    if(f.id==="clientTypeOther"){const ct=ans.clientType||"";return ct.includes("Other")||ct.includes("Autre")||ct.includes("Andere")||ct.includes("Otra");}
+    return true;
+  }
+
+  function canProceed(){
+    if(!cur)return false;
+    return cur.fields.every(f=>{
+      if(!visible(f)||!f.required)return true;
+      const v=ans[f.id];
+      if(f.type==="bizmatrix")return v&&BIZ_LINES.some(l=>CHANNELS.some(c=>v[l.id]&&v[l.id][c]));
+      return v&&String(v).trim()!=="";
+    });
+  }
+
+  async function generate(){
+    const c=classify(ans);setCls(c);setLoading(true);setDoc(null);
+    const apiKey=window._smeetzApiKey;
+    if(!apiKey){
+      const key=window.prompt("Please enter your Anthropic API key to generate the document.\n\nYou can find it at: console.anthropic.com");
+      if(!key){setLoading(false);return;}
+      window._smeetzApiKey=key.trim();
+    }
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":window._smeetzApiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:prompt(ans,c)}]})});
+      if(!r.ok){
+        const err=await r.json();
+        if(err.error?.type==="authentication_error"){window._smeetzApiKey=null;}
+        throw new Error(err.error?.message||"API error "+r.status);
+      }
+      const d=await r.json();
+      setDoc(d.content?.map(b=>b.text||"").join("")||"Error generating document.");
+    }catch(e){setDoc("❌ Error: "+e.message+"\n\nPlease reload and try again with a valid API key.");}
+    setLoading(false);
+  }
+
+  async function handleDl(){setDlLoad(true);try{await dlDocx(doc,ans.clientName);}catch(e){alert(e.message);}setDlLoad(false);}
+  function copy(){navigator.clipboard.writeText(doc);setCopied(true);setTimeout(()=>setCopied(false),2000);}
+  function restart(){setStep(0);setAns({});setDoc(null);setCls(null);setLang(null);}
+
+  const clrMap={Online:"#22c55e",Standard:"#f59e0b",Advanced:"#ef4444"};
+  const clrDesc={Online:"Digital-only, rapid deployment (2–4 weeks).",Standard:"Physical + digital, single site (2–4 months).",Advanced:"Multi-site, multi-system, phased rollout (6+ months)."};
+  const hasCD=["Yes","Oui","Ja","Sí"].includes(ans.customDev);
+  const progress=STEPS.length?(step/STEPS.length)*100:0;
+
+  function renderDoc(md){
+    return md.split("\n").map((line,i,arr)=>{
+      if(line.match(/^\|[-| ]+\|$/))return null;
+      if(line.startsWith("# "))return <h1 key={i} style={{color:"#1e3a5f",fontSize:20,fontWeight:700,marginBottom:8}}>{line.slice(2)}</h1>;
+      if(line.startsWith("## ⚠"))return <h2 key={i} style={{color:"#c0392b",marginTop:22,marginBottom:4,fontSize:16,borderBottom:"3px solid #c0392b",paddingBottom:3}}>{line.slice(3)}</h2>;
+      if(line.startsWith("## "))return <h2 key={i} style={{color:"#1e3a5f",marginTop:22,marginBottom:4,fontSize:16,borderBottom:"2px solid #00b4d8",paddingBottom:3}}>{line.slice(3)}</h2>;
+      if(line.startsWith("### "))return <h3 key={i} style={{color:"#0077a8",marginTop:14,marginBottom:3,fontSize:14}}>{line.slice(4)}</h3>;
+      if(line.startsWith("#### "))return <h4 key={i} style={{color:"#333",marginTop:10,marginBottom:2,fontSize:13,fontStyle:"italic"}}>{line.slice(5)}</h4>;
+      if(line.startsWith("> "))return <div key={i} style={{borderLeft:"4px solid #1e3a5f",paddingLeft:12,margin:"8px 0",color:"#374151",fontStyle:"italic",fontSize:12}}>{line.slice(2).replace(/\*/g,"")}</div>;
+      if(line.startsWith("|")){
+        const cells=line.split("|").slice(1,-1);
+        const isHdr=!!(arr[i+1]||"").match(/^\|[-| ]+\|$/);
+        return <tr key={i}>{cells.map((c,j)=>isHdr?<th key={j} style={{background:"#1e3a5f",color:"#fff",padding:"6px 10px",fontSize:12,textAlign:"left"}}>{c.trim()}</th>:<td key={j} style={{padding:"5px 10px",fontSize:12,borderBottom:"1px solid #e5e7eb"}}>{c.trim()}</td>)}</tr>;
+      }
+      if(line.startsWith("- "))return <li key={i} style={{fontSize:13,marginBottom:2,marginLeft:16}}>{line.slice(2)}</li>;
+      if(line.trim()==="")return <div key={i} style={{height:6}}/>;
+      return <p key={i} dangerouslySetInnerHTML={{__html:line.replace(/\*\*(.*?)\*\*/g,"<b>$1</b>")}} style={{fontSize:13,margin:"2px 0",lineHeight:1.6}}/>;
+    }).filter(Boolean);
+  }
+
+  function wrapTables(els){
+    const res=[];let rows=[];
+    els.forEach((el,i)=>{
+      if(el?.type==="tr"){rows.push(el);}
+      else{if(rows.length){res.push(<table key={"t"+i} style={{width:"100%",borderCollapse:"collapse",margin:"8px 0",border:"1px solid #e5e7eb"}}><tbody>{rows}</tbody></table>);rows=[];}res.push(el);}
+    });
+    if(rows.length)res.push(<table key="tend" style={{width:"100%",borderCollapse:"collapse",margin:"8px 0",border:"1px solid #e5e7eb"}}><tbody>{rows}</tbody></table>);
+    return res;
+  }
+
+  const btn=(label,onClick,opts={})=>(
+    <button onClick={onClick} disabled={opts.disabled} style={{padding:"10px "+(opts.wide?"28px":"18px"),borderRadius:8,border:opts.outline?"1.5px solid #00b4d8":"none",background:opts.disabled?"#9ca3af":opts.outline?"#fff":opts.color||"#1e3a5f",color:opts.outline?"#00b4d8":"#fff",fontWeight:700,fontSize:13,cursor:opts.disabled?"not-allowed":"pointer"}}>{label}</button>
+  );
+
+  if(!lang)return(
+    <div style={{fontFamily:"Inter,system-ui,sans-serif",minHeight:"100vh",background:"#f0f4f8",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#1e3a5f",color:"#fff",padding:"16px 24px",display:"flex",alignItems:"center",gap:12}}>
+        <div style={{background:"#00b4d8",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:18}}>S</div>
+        <div><div style={{fontWeight:700,fontSize:16}}>Smeetz Implementation Scoping</div><div style={{fontSize:12,opacity:.8}}>Sales → Implementation Handover Tool</div></div>
+      </div>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:32}}>
+        <div style={{background:"#fff",borderRadius:20,boxShadow:"0 4px 32px rgba(0,0,0,.1)",padding:"48px 40px",maxWidth:480,width:"100%",textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:16}}>🌍</div>
+          <h2 style={{color:"#1e3a5f",fontSize:22,marginBottom:8}}>Select your language</h2>
+          <p style={{color:"#6b7280",fontSize:14,marginBottom:32}}>Questionnaire in your language.<br/>Scoping document always generated in <strong>English</strong>.</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {Object.entries(T).map(([code,tr])=>(
+              <button key={code} onClick={()=>setLang(code)} style={{padding:"18px 12px",borderRadius:12,border:"2px solid #e5e7eb",background:"#fff",cursor:"pointer",fontSize:16,fontWeight:600,color:"#1e3a5f"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#00b4d8";e.currentTarget.style.background="#f0f9ff";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="#e5e7eb";e.currentTarget.style.background="#fff";}}>
+                {tr.langLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const inp={width:"100%",padding:"10px 12px",border:"1.5px solid #e5e7eb",borderRadius:8,fontSize:13,outline:"none",boxSizing:"border-box"};
+
+  return(
+    <div style={{fontFamily:"Inter,system-ui,sans-serif",minHeight:"100vh",background:"#f0f4f8",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#1e3a5f",color:"#fff",padding:"16px 24px",display:"flex",alignItems:"center",gap:12}}>
+        <div style={{background:"#00b4d8",borderRadius:8,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:18}}>S</div>
+        <div style={{flex:1}}><div style={{fontWeight:700,fontSize:16}}>Smeetz Implementation Scoping</div><div style={{fontSize:12,opacity:.8}}>{t.appSubtitle}</div></div>
+        <button onClick={()=>{setLang(null);setStep(0);setAns({});setDoc(null);}} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:12}}>{T[lang].langLabel} ▾</button>
+      </div>
+
+      {!doc?(
+        <div style={{flex:1,display:"flex",justifyContent:"center",padding:"32px 16px"}}>
+          <div style={{width:"100%",maxWidth:680}}>
+            <div style={{marginBottom:24}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#6b7280",marginBottom:6}}>
+                <span>{t.stepOf(step+1,STEPS.length)}</span><span>{Math.round(progress)}{t.complete}</span>
+              </div>
+              <div style={{height:6,background:"#e5e7eb",borderRadius:99}}><div style={{height:6,background:"#00b4d8",borderRadius:99,width:progress+"%",transition:"width .3s"}}/></div>
+              <div style={{display:"flex",gap:4,marginTop:8}}>
+                {STEPS.map((_,i)=><div key={i} style={{flex:1,height:4,borderRadius:99,background:i<=step?"#00b4d8":"#e5e7eb",cursor:i<step?"pointer":"default"}} onClick={()=>i<step&&setStep(i)}/>)}
+              </div>
+            </div>
+            <div style={{background:"#fff",borderRadius:16,boxShadow:"0 4px 24px rgba(0,0,0,.08)",padding:32}}>
+              <div style={{fontSize:24,marginBottom:4}}>{cur.icon}</div>
+              <h2 style={{color:"#1e3a5f",margin:"0 0 24px",fontSize:20,fontWeight:700}}>{cur.title}</h2>
+              {cur.fields.filter(f=>visible(f)).map(f=>(
+                <div key={f.id} style={{marginBottom:20}}>
+                  <label style={{display:"block",fontWeight:600,fontSize:13,color:"#374151",marginBottom:6}}>{f.label}{f.required&&<span style={{color:"#ef4444"}}> *</span>}</label>
+                  {f.type==="bizmatrix"&&<div><p style={{fontSize:12,color:"#6b7280",marginBottom:8}}>{t.bizLinesHint}</p><BizMatrix value={ans[f.id]} onChange={v=>chg(f.id,v)}/></div>}
+                  {f.type==="text"&&<input value={ans[f.id]||""} onChange={e=>chg(f.id,e.target.value)} placeholder={f.placeholder||""} style={inp}/>}
+                  {f.type==="textarea"&&<textarea value={ans[f.id]||""} onChange={e=>chg(f.id,e.target.value)} placeholder={f.placeholder||""} rows={3} style={{...inp,resize:"vertical"}}/>}
+                  {f.type==="select"&&<select value={ans[f.id]||""} onChange={e=>chg(f.id,e.target.value)} style={{...inp,background:"#fff"}}><option value="">{t.select}</option>{f.options.map(o=><option key={o} value={o}>{o}</option>)}</select>}
+                </div>
+              ))}
+              {hasCD&&cur.title.toLowerCase().includes("integr")&&(
+                <div style={{background:"#fef2f2",border:"2px solid #fca5a5",borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",gap:10}}>
+                  <span style={{fontSize:20}}>⚠️</span>
+                  <div><div style={{fontWeight:700,color:"#c0392b",fontSize:13}}>Custom Development flagged</div>
+                  <div style={{fontSize:12,color:"#7f1d1d",marginTop:2}}>Will be highlighted as additional scope in the document and requires product team validation.</div></div>
+                </div>
+              )}
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:28}}>
+                {btn(t.back,()=>setStep(s=>s-1),{disabled:step===0,outline:true})}
+                {step<STEPS.length-1
+                  ?btn(t.next,()=>setStep(s=>s+1),{disabled:!canProceed(),color:"#1e3a5f",wide:true})
+                  :btn(t.generate,generate,{disabled:!canProceed(),color:"#00b4d8",wide:true})
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      ):loading?(
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+          <div style={{width:56,height:56,border:"5px solid #e5e7eb",borderTop:"5px solid #00b4d8",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+          <div style={{color:"#1e3a5f",fontWeight:600}}>{t.generating}</div>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      ):(
+        <div style={{flex:1,padding:"24px 16px",display:"flex",justifyContent:"center"}}>
+          <div style={{width:"100%",maxWidth:860}}>
+            <div style={{background:"#fff",borderRadius:12,padding:"16px 24px",marginBottom:16,boxShadow:"0 2px 12px rgba(0,0,0,.06)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:11,color:"#6b7280",marginBottom:4,letterSpacing:.5}}>{t.classifiedAs}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                    <span style={{background:clrMap[cls],color:"#fff",padding:"4px 16px",borderRadius:99,fontWeight:700,fontSize:15}}>{cls}</span>
+                    <span style={{fontSize:12,color:"#374151"}}>{clrDesc[cls]}</span>
+                    {hasCD&&<span style={{background:"#fef2f2",color:"#c0392b",border:"1px solid #fca5a5",padding:"4px 12px",borderRadius:99,fontWeight:700,fontSize:12}}>⚠️ Custom Dev</span>}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {btn(copied?t.copied:t.copyMd,copy,{outline:true})}
+                  {btn(dlLoad?t.downloading:t.downloadDocx,handleDl,{disabled:dlLoad,color:"#00b4d8"})}
+                  {btn(t.newProject,restart)}
+                </div>
+              </div>
+              {hasCD&&<div style={{marginTop:10,padding:"10px 14px",background:"#fef2f2",borderRadius:8,border:"1px solid #fca5a5",fontSize:12,color:"#c0392b",fontWeight:600,display:"flex",gap:8}}><span>⚠️</span><span>Custom development included — see Section 10 in the document.</span></div>}
+              <div style={{marginTop:8,padding:"8px 14px",background:"#f0f9ff",borderRadius:8,border:"1px solid #bae6fd",fontSize:12,color:"#0369a1",display:"flex",gap:8}}><span>📁</span><span>{t.docxHint}</span></div>
+            </div>
+            <div style={{background:"#fff",borderRadius:16,boxShadow:"0 4px 24px rgba(0,0,0,.08)",padding:"40px 48px",lineHeight:1.6}}>
+              {wrapTables(renderDoc(doc))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
